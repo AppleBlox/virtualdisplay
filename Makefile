@@ -4,7 +4,7 @@ BINARY = $(BUILD)/$(APP)
 
 ARCH   = $(shell uname -m)
 SDK    = $(shell xcrun --sdk macosx --show-sdk-path)
-TARGET = $(ARCH)-apple-macos14.0
+TARGET = $(ARCH)-apple-macos11.0
 SIGN  ?= -
 
 SOURCES = src/main.swift src/App.swift
