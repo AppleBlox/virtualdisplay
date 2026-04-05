@@ -2,6 +2,8 @@ import Cocoa
 
 class AppDelegate: NSObject, NSApplicationDelegate {
     private let showMenu: Bool
+    private let customWidth: Int?
+    private let customHeight: Int?
     private var virtualDisplay: CGVirtualDisplay?
     private var statusItem: NSStatusItem?
     private var nativeMode: CGDisplayMode?
@@ -10,8 +12,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var isStopping = false
     private var pollTimer: Timer?
 
-    init(showMenu: Bool) {
+    init(showMenu: Bool, width: Int? = nil, height: Int? = nil) {
         self.showMenu = showMenu
+        self.customWidth = width
+        self.customHeight = height
     }
 
     func applicationDidFinishLaunching(_: Notification) {
@@ -31,9 +35,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         guard let screen = NSScreen.main else { return }
         physicalDisplayID = CGMainDisplayID()
 
-        let w = Int(screen.frame.width)
-        let h = Int(screen.frame.height)
-        let scale = Int(screen.backingScaleFactor)
+        let nativeScale = Int(screen.backingScaleFactor)
+        let w = customWidth  ?? Int(screen.frame.width)
+        let h = customHeight ?? Int(screen.frame.height)
+        let isNative = customWidth == nil && customHeight == nil
+        let scale = isNative ? nativeScale : 1
 
         let descriptor = CGVirtualDisplayDescriptor()
         descriptor.setDispatchQueue(.main)
@@ -48,7 +54,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         let display = CGVirtualDisplay(descriptor: descriptor)
         let settings = CGVirtualDisplaySettings()
-        settings.hiDPI = scale > 1 ? 1 : 0
+        settings.hiDPI = isNative && scale > 1 ? 1 : 0
         settings.modes = [
             CGVirtualDisplayMode(width: UInt(w), height: UInt(h), refreshRate: 240),
             CGVirtualDisplayMode(width: UInt(w), height: UInt(h), refreshRate: 60),
