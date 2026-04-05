@@ -35,17 +35,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         guard let screen = NSScreen.main else { return }
         physicalDisplayID = CGMainDisplayID()
 
-        let nativeScale = Int(screen.backingScaleFactor)
-        let w = customWidth  ?? Int(screen.frame.width)
-        let h = customHeight ?? Int(screen.frame.height)
-        let isNative = customWidth == nil && customHeight == nil
-        let scale = isNative ? nativeScale : 1
+        let currentMode = CGDisplayCopyDisplayMode(physicalDisplayID)
+        let panelW = customWidth  ?? (currentMode?.pixelWidth  ?? CGDisplayPixelsWide(physicalDisplayID))
+        let panelH = customHeight ?? (currentMode?.pixelHeight ?? CGDisplayPixelsHigh(physicalDisplayID))
 
         let descriptor = CGVirtualDisplayDescriptor()
         descriptor.setDispatchQueue(.main)
         descriptor.name = "Virtual 240Hz"
-        descriptor.maxPixelsWide = UInt32(w * scale)
-        descriptor.maxPixelsHigh = UInt32(h * scale)
+        descriptor.maxPixelsWide = UInt32(panelW)
+        descriptor.maxPixelsHigh = UInt32(panelH)
         descriptor.sizeInMillimeters = screen.physicalSizeInMillimeters
         descriptor.productID = 0x1234
         descriptor.vendorID = 0x3456
@@ -54,10 +52,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         let display = CGVirtualDisplay(descriptor: descriptor)
         let settings = CGVirtualDisplaySettings()
-        settings.hiDPI = isNative && scale > 1 ? 1 : 0
+        settings.hiDPI = 0
         settings.modes = [
-            CGVirtualDisplayMode(width: UInt(w), height: UInt(h), refreshRate: 240),
-            CGVirtualDisplayMode(width: UInt(w), height: UInt(h), refreshRate: 60),
+            CGVirtualDisplayMode(width: UInt(panelW), height: UInt(panelH), refreshRate: 240),
+            CGVirtualDisplayMode(width: UInt(panelW), height: UInt(panelH), refreshRate: 60),
         ]
         display.apply(settings)
         virtualDisplay = display
