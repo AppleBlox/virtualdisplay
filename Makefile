@@ -32,3 +32,6 @@ clean:
 
 install: build
 	cp $(BINARY) /usr/local/bin/$(APP)
+
+test:
+	bash tests/run.sh
