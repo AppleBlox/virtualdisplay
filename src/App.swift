@@ -6,6 +6,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private let customWidth: Int?
     private let customHeight: Int?
     private let refreshRate: Double
+    private let targetDisplayID: CGDirectDisplayID?
     private var virtualDisplay: CGVirtualDisplay?
     private var statusItem: NSStatusItem?
     private var nativeMode: CGDisplayMode?
@@ -15,11 +16,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var pollTimer: Timer?
     private var colorProfileTmpURL: URL?
 
-    init(showMenu: Bool, width: Int? = nil, height: Int? = nil, hz: Double = 240.0) {
+    init(showMenu: Bool, width: Int? = nil, height: Int? = nil, hz: Double = 240.0, displayID: UInt32? = nil) {
         self.showMenu = showMenu
         self.customWidth = width
         self.customHeight = height
         self.refreshRate = hz
+        self.targetDisplayID = displayID.map { CGDirectDisplayID($0) }
     }
 
     func applicationDidFinishLaunching(_: Notification) {
@@ -36,12 +38,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func setupVirtualDisplay() {
-        // Prefer the built-in display so external monitors are not affected.
         var count: CGDisplayCount = 0
         CGGetActiveDisplayList(0, nil, &count)
         var ids = [CGDirectDisplayID](repeating: 0, count: Int(count))
         CGGetActiveDisplayList(count, &ids, &count)
-        physicalDisplayID = ids.first(where: { CGDisplayIsBuiltin($0) != 0 }) ?? CGMainDisplayID()
+
+        if let target = targetDisplayID, ids.contains(target) {
+            physicalDisplayID = target
+        } else {
+            if targetDisplayID != nil {
+                fputs("Warning: display ID \(targetDisplayID!) not found, falling back to default\n", stderr)
+            }
+            physicalDisplayID = ids.first(where: { CGDisplayIsBuiltin($0) != 0 }) ?? CGMainDisplayID()
+        }
 
         let warnings = runDiagnostics(physicalDisplayID: physicalDisplayID)
         for w in warnings {
@@ -88,12 +97,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         guard ids.contains(vd.displayID) else { return }
         pollTimer?.invalidate()
         pollTimer = nil
-        applyColorProfile(to: vd.displayID)
         enableMirroring()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            self?.applyColorProfile(to: vd.displayID)
+        }
     }
 
-    // Copy the physical display's ICC profile to the virtual display so apps
-    // running on it use the correct color space.
     private func applyColorProfile(to virtualID: CGDirectDisplayID) {
         guard
             let screen = NSScreen.screens.first(where: { $0.displayID == physicalDisplayID }),
@@ -122,7 +131,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         guard let vd = virtualDisplay else { return }
         nativeMode = CGDisplayCopyDisplayMode(physicalDisplayID)
 
-        // Break ALL existing mirror sets first to start clean.
         var count: CGDisplayCount = 0
         CGGetActiveDisplayList(0, nil, &count)
         var ids = [CGDirectDisplayID](repeating: 0, count: Int(count))
@@ -135,13 +143,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 CGConfigureDisplayMirrorOfDisplay(cfg, id, kCGNullDirectDisplay)
             }
         }
+        CGConfigureDisplayMirrorOfDisplay(cfg, physicalDisplayID, vd.displayID)
         CGCompleteDisplayConfiguration(cfg, CGConfigureOption(rawValue: 0))
-
-        // Now mirror ONLY the physical built-in display to the virtual one.
-        var cfg2: CGDisplayConfigRef?
-        CGBeginDisplayConfiguration(&cfg2)
-        CGConfigureDisplayMirrorOfDisplay(cfg2, physicalDisplayID, vd.displayID)
-        CGCompleteDisplayConfiguration(cfg2, CGConfigureOption(rawValue: 0))
     }
 
     private func disableMirroring() {
