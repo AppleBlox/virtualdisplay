@@ -106,11 +106,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         guard (try? iccData.write(to: url)) != nil else { return }
         colorProfileTmpURL = url
 
-        ColorSyncDeviceSetCustomProfiles(
-            "mntr" as CFString,
-            uuid,
-            ["DeviceDefaultProfile": url] as CFDictionary
-        )
+        func apply() {
+            ColorSyncDeviceSetCustomProfiles(
+                "mntr" as CFString,
+                uuid,
+                ["DeviceDefaultProfile": url] as CFDictionary
+            )
+        }
+
+        apply()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { apply() }
     }
 
     private func enableMirroring() {
