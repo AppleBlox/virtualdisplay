@@ -116,23 +116,42 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private func enableMirroring() {
         guard let vd = virtualDisplay else { return }
         nativeMode = CGDisplayCopyDisplayMode(physicalDisplayID)
-        if CGDisplayIsInMirrorSet(physicalDisplayID) != 0 {
-            var cfg: CGDisplayConfigRef?
-            CGBeginDisplayConfiguration(&cfg)
-            CGConfigureDisplayMirrorOfDisplay(cfg, physicalDisplayID, kCGNullDirectDisplay)
-            CGCompleteDisplayConfiguration(cfg, CGConfigureOption(rawValue: 0))
-        }
+
+        // Break ALL existing mirror sets first to start clean.
+        var count: CGDisplayCount = 0
+        CGGetActiveDisplayList(0, nil, &count)
+        var ids = [CGDirectDisplayID](repeating: 0, count: Int(count))
+        CGGetActiveDisplayList(count, &ids, &count)
+
         var cfg: CGDisplayConfigRef?
         CGBeginDisplayConfiguration(&cfg)
-        CGConfigureDisplayMirrorOfDisplay(cfg, physicalDisplayID, vd.displayID)
+        for id in ids {
+            if CGDisplayIsInMirrorSet(id) != 0 {
+                CGConfigureDisplayMirrorOfDisplay(cfg, id, kCGNullDirectDisplay)
+            }
+        }
         CGCompleteDisplayConfiguration(cfg, CGConfigureOption(rawValue: 0))
+
+        // Now mirror ONLY the physical built-in display to the virtual one.
+        var cfg2: CGDisplayConfigRef?
+        CGBeginDisplayConfiguration(&cfg2)
+        CGConfigureDisplayMirrorOfDisplay(cfg2, physicalDisplayID, vd.displayID)
+        CGCompleteDisplayConfiguration(cfg2, CGConfigureOption(rawValue: 0))
     }
 
     private func disableMirroring() {
-        guard CGDisplayIsInMirrorSet(physicalDisplayID) != 0 else { return }
+        var count: CGDisplayCount = 0
+        CGGetActiveDisplayList(0, nil, &count)
+        var ids = [CGDirectDisplayID](repeating: 0, count: Int(count))
+        CGGetActiveDisplayList(count, &ids, &count)
+
         var cfg: CGDisplayConfigRef?
         CGBeginDisplayConfiguration(&cfg)
-        CGConfigureDisplayMirrorOfDisplay(cfg, physicalDisplayID, kCGNullDirectDisplay)
+        for id in ids {
+            if CGDisplayIsInMirrorSet(id) != 0 {
+                CGConfigureDisplayMirrorOfDisplay(cfg, id, kCGNullDirectDisplay)
+            }
+        }
         if let mode = nativeMode {
             CGConfigureDisplayWithDisplayMode(cfg, physicalDisplayID, mode, nil)
         }
