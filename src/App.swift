@@ -43,6 +43,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         CGGetActiveDisplayList(count, &ids, &count)
         physicalDisplayID = ids.first(where: { CGDisplayIsBuiltin($0) != 0 }) ?? CGMainDisplayID()
 
+        let warnings = runDiagnostics(physicalDisplayID: physicalDisplayID)
+        for w in warnings {
+            fputs("Warning [\(w.code)]: \(w.message)\n", stderr)
+        }
+
         guard let screen = NSScreen.screens.first(where: { $0.displayID == physicalDisplayID }) ?? NSScreen.main else { return }
 
         let metrics = metricsFromScreen(screen, displayID: physicalDisplayID)

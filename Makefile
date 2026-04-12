@@ -7,7 +7,7 @@ SDK    = $(shell xcrun --sdk macosx --show-sdk-path)
 TARGET = $(ARCH)-apple-macos11.0
 SIGN  ?= -
 
-SOURCES = src/main.swift src/App.swift src/Resolution.swift
+SOURCES = src/main.swift src/App.swift src/Resolution.swift src/Diagnostics.swift
 
 .PHONY: build clean install
 
