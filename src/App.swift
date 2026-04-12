@@ -14,6 +14,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var signalSources: [DispatchSourceSignal] = []
     private var isStopping = false
     private var pollTimer: Timer?
+    private var pollCount = 0
     private var colorProfileTmpURL: URL?
 
     init(showMenu: Bool, width: Int? = nil, height: Int? = nil, hz: Double = 240.0, displayID: UInt32? = nil) {
@@ -33,8 +34,28 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             src.resume()
             signalSources.append(src)
         }
+        let ws = NSWorkspace.shared.notificationCenter
+        ws.addObserver(self, selector: #selector(handleSleep), name: NSWorkspace.willSleepNotification, object: nil)
+        ws.addObserver(self, selector: #selector(handleWake), name: NSWorkspace.didWakeNotification, object: nil)
         setupVirtualDisplay()
         if showMenu { setupStatusBar() }
+    }
+
+    @objc private func handleSleep() {
+        teardownVirtualDisplay()
+    }
+
+    @objc private func handleWake() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+            self?.setupVirtualDisplay()
+        }
+    }
+
+    private func teardownVirtualDisplay() {
+        pollTimer?.invalidate()
+        pollTimer = nil
+        disableMirroring()
+        virtualDisplay = nil
     }
 
     private func setupVirtualDisplay() {
@@ -74,6 +95,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         descriptor.terminationHandler = { [weak self] _, _ in self?.virtualDisplay = nil }
 
         let display = CGVirtualDisplay(descriptor: descriptor)
+        if display.displayID == 0 {
+            fputs("Error: failed to create virtual display (unsupported hardware?)\n", stderr)
+            return
+        }
         let settings = CGVirtualDisplaySettings()
         settings.hiDPI = resolved.hiDPI ? 1 : 0
         settings.modes = [
@@ -83,6 +108,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         display.apply(settings)
         virtualDisplay = display
 
+        pollCount = 0
         pollTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
             self?.pollForMirroring()
         }
@@ -90,6 +116,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func pollForMirroring() {
         guard let vd = virtualDisplay else { pollTimer?.invalidate(); return }
+        pollCount += 1
+        if pollCount > 20 {
+            fputs("Error: virtual display did not appear after 10 seconds\n", stderr)
+            pollTimer?.invalidate()
+            pollTimer = nil
+            return
+        }
         var count: CGDisplayCount = 0
         CGGetActiveDisplayList(0, nil, &count)
         var ids = [CGDirectDisplayID](repeating: 0, count: Int(count))
@@ -180,10 +213,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     @objc func stop() {
         guard !isStopping else { return }
         isStopping = true
-        pollTimer?.invalidate()
-        pollTimer = nil
-        disableMirroring()
-        virtualDisplay = nil
+        NSWorkspace.shared.notificationCenter.removeObserver(self)
+        teardownVirtualDisplay()
         if let url = colorProfileTmpURL {
             try? FileManager.default.removeItem(at: url)
         }
