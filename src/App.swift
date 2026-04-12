@@ -45,24 +45,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         guard let screen = NSScreen.screens.first(where: { $0.displayID == physicalDisplayID }) ?? NSScreen.main else { return }
 
-        let scale = screen.backingScaleFactor
-        let currentMode = CGDisplayCopyDisplayMode(physicalDisplayID)
-        let physicalW = currentMode?.pixelWidth  ?? CGDisplayPixelsWide(physicalDisplayID)
-        let physicalH = currentMode?.pixelHeight ?? CGDisplayPixelsHigh(physicalDisplayID)
-
-        let isCustom = customWidth != nil || customHeight != nil
-        // Divide physical pixels by scale to get HiDPI logical dimensions that render
-        // at exactly the panel's native pixel count, regardless of the user's chosen
-        // "looks like" scaled resolution.
-        let w = customWidth  ?? Int((Double(physicalW) / scale).rounded())
-        let h = customHeight ?? Int((Double(physicalH) / scale).rounded())
+        let metrics = metricsFromScreen(screen, displayID: physicalDisplayID)
+        let resolved = resolveDisplay(metrics: metrics, customWidth: customWidth, customHeight: customHeight)
 
         let descriptor = CGVirtualDisplayDescriptor()
         descriptor.setDispatchQueue(.main)
-        descriptor.name = "Virtual 240Hz"
-        descriptor.maxPixelsWide = UInt32(isCustom ? w : physicalW)
-        descriptor.maxPixelsHigh = UInt32(isCustom ? h : physicalH)
-        descriptor.sizeInMillimeters = screen.physicalSizeInMillimeters
+        descriptor.name = "Virtual \(Int(refreshRate))Hz"
+        descriptor.maxPixelsWide = UInt32(resolved.maxPixelsWide)
+        descriptor.maxPixelsHigh = UInt32(resolved.maxPixelsHigh)
+        descriptor.sizeInMillimeters = metrics.physicalSizeMM
         descriptor.productID = 0x1234
         descriptor.vendorID = 0x3456
         descriptor.serialNum = 0x0002
@@ -70,10 +61,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         let display = CGVirtualDisplay(descriptor: descriptor)
         let settings = CGVirtualDisplaySettings()
-        settings.hiDPI = (!isCustom && scale > 1) ? 1 : 0
+        settings.hiDPI = resolved.hiDPI ? 1 : 0
         settings.modes = [
-            CGVirtualDisplayMode(width: UInt(w), height: UInt(h), refreshRate: refreshRate),
-            CGVirtualDisplayMode(width: UInt(w), height: UInt(h), refreshRate: 60),
+            CGVirtualDisplayMode(width: UInt(resolved.width), height: UInt(resolved.height), refreshRate: refreshRate),
+            CGVirtualDisplayMode(width: UInt(resolved.width), height: UInt(resolved.height), refreshRate: 60),
         ]
         display.apply(settings)
         virtualDisplay = display
@@ -168,7 +159,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 }
 
-private extension NSScreen {
+extension NSScreen {
     var displayID: CGDirectDisplayID {
         deviceDescription[NSDeviceDescriptionKey(rawValue: "NSScreenNumber")] as! CGDirectDisplayID
     }
