@@ -198,6 +198,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         CGCompleteDisplayConfiguration(cfg, CGConfigureOption(rawValue: 0))
         nativeMode = nil
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            let task = Process()
+            task.launchPath = "/usr/bin/killall"
+            task.arguments = ["Dock"]
+            try? task.run()
+        }
     }
 
     private func setupStatusBar() {
