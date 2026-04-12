@@ -11,9 +11,11 @@ if argv.contains("--help") {
     print("""
     Usage: virtualdisplay [options]
 
-    Creates a virtual 240Hz display and mirrors the main screen to it.
+    Creates a virtual display at a custom refresh rate and mirrors the main
+    screen to it.
 
     Options:
+      --hz <rate>    Refresh rate for the virtual display (default: 240)
       --width <px>   Custom width for the virtual display (stretched resolution)
       --height <px>  Custom height for the virtual display (stretched resolution)
       --no-menu      Run without a menu bar icon (stop with SIGTERM or Ctrl-C)
@@ -24,12 +26,19 @@ if argv.contains("--help") {
 
 let customWidth  = argValue("--width").flatMap(Int.init)
 let customHeight = argValue("--height").flatMap(Int.init)
+let refreshRate  = argValue("--hz").flatMap(Double.init) ?? 240.0
+
+if refreshRate < 1 || refreshRate > 600 {
+    fputs("Error: --hz must be between 1 and 600\n", stderr)
+    exit(1)
+}
 
 let app = NSApplication.shared
 let delegate = AppDelegate(
     showMenu: !argv.contains("--no-menu"),
     width: customWidth,
-    height: customHeight
+    height: customHeight,
+    hz: refreshRate
 )
 app.delegate = delegate
 app.run()
