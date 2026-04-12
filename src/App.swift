@@ -101,10 +101,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         let settings = CGVirtualDisplaySettings()
         settings.hiDPI = resolved.hiDPI ? 1 : 0
-        settings.modes = [
+        var modes = [
             CGVirtualDisplayMode(width: UInt(resolved.width), height: UInt(resolved.height), refreshRate: refreshRate),
             CGVirtualDisplayMode(width: UInt(resolved.width), height: UInt(resolved.height), refreshRate: 60),
         ]
+        if resolved.hiDPI && (resolved.maxPixelsWide != resolved.width || resolved.maxPixelsHigh != resolved.height) {
+            modes.append(CGVirtualDisplayMode(width: UInt(resolved.maxPixelsWide), height: UInt(resolved.maxPixelsHigh), refreshRate: refreshRate))
+            modes.append(CGVirtualDisplayMode(width: UInt(resolved.maxPixelsWide), height: UInt(resolved.maxPixelsHigh), refreshRate: 60))
+        }
+        settings.modes = modes
         display.apply(settings)
         virtualDisplay = display
 
